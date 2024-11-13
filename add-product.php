@@ -53,7 +53,7 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     <style>
         body {
             font-family: 'Poppins', sans-serif;
-            background: linear-gradient(to right, #000000, gray, #ffffff); /* Consistent gradient */
+            background: #ffffff
             margin: 0;
             padding: 0;
             color: #333; /* General text color */
