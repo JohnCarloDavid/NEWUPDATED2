@@ -5,7 +5,7 @@ session_start();
 // Include database connection file
 include('db_connection.php');
 
-// Check if the user is logged in, if not then redirect to the login page
+// Check if the user is logged in
 if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     header("Location: login.php");
     exit;
@@ -19,24 +19,38 @@ if (isset($_POST['searchName'])) {
     $searchName = $_POST['searchName'];
 }
 
-// Query to select all rows from the tb_orders table (one product per order per customer)
-$sql = "SELECT customer_name, product_name, quantity, order_date FROM tb_orders";
-if ($searchName) {
-    // Add WHERE clause to filter orders by customer name
-    $sql .= " WHERE customer_name LIKE '%" . $conn->real_escape_string($searchName) . "%'";
+// Query to select all orders along with size and price from inventory
+$sql = "SELECT o.customer_name, o.order_date, o.product_name, o.quantity, i.size, i.price 
+        FROM tb_orders o 
+        JOIN tb_inventory i ON o.product_name = i.name";
+
+if (!empty($searchName)) {
+    // Add a WHERE clause to filter orders by customer name
+    $sql .= " WHERE o.customer_name LIKE '%" . $conn->real_escape_string($searchName) . "%'";
 }
 
+$sql .= " ORDER BY o.customer_name, o.order_date ASC";
+
 $result = $conn->query($sql);
+
+if (!$result) {
+    die("Error executing query: " . $conn->error);
+}
 
 // Initialize totals
 $totalOrders = 0;
 $totalQuantity = 0;
+$totalAmount = 0;
 
-// Fetch data from the database and calculate totals
+// Calculate totals
 while ($row = $result->fetch_assoc()) {
     $totalOrders++;
-    $totalQuantity += $row['quantity']; // Ensure 'quantity' column exists
+    $totalQuantity += $row['quantity'];
+    $totalAmount += $row['quantity'] * $row['price'];
 }
+
+// Reset result pointer for looping again
+$result->data_seek(0);
 ?>
 
 <!DOCTYPE html>
@@ -49,13 +63,12 @@ while ($row = $result->fetch_assoc()) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
     <style>
-        /* Body and general styling */
+        /* General Styles */
         body {
             font-family: 'Poppins', sans-serif;
-            display: flex;
             margin: 0;
             color: #2c3e50;
-            transition: background-color 0.3s ease, color 0.3s ease;
+            background-color: #f9f9f9;
         }
 
         .dark-mode {
@@ -63,6 +76,7 @@ while ($row = $result->fetch_assoc()) {
             color: #ecf0f1;
         }
 
+        /* Sidebar Styling */
         .sidebar {
             width: 260px;
             background: linear-gradient(145deg, #34495e, #2c3e50);
@@ -109,45 +123,51 @@ while ($row = $result->fetch_assoc()) {
             margin-right: 15px;
         }
 
+        /* Main Content Styling */
         .mainContent {
             margin-left: 280px;
             padding: 30px;
             width: calc(100% - 280px);
-            min-height: 100vh;
-            transition: background-color 0.3s ease, color 0.3s ease;
-        }
-
-        .mainHeader {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
         }
 
         .mainHeader h1 {
             font-size: 2.5rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            color: #34495e;
+        }
+
+        .totalsSection {
+            display: flex;
+            justify-content: space-around;
             margin-bottom: 2rem;
+            background: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .totalsSection div {
             text-align: center;
         }
 
-        .headerActions .button {
-            background-color: #3498db;
-            color: #ffffff;
-            padding: 10px 15px;
-            border-radius: 8px;
-            cursor: pointer;
-            text-decoration: none;
-            font-size: 1rem;
-            display: flex;
-            align-items: center;
-            transition: background-color 0.3s ease;
+        .totalsSection div h2 {
+            font-size: 1.5rem;
+            color: #3498db;
+            margin: 0;
         }
 
-        .headerActions .button i {
-            margin-right: 8px;
+        .totalsSection div span {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #2c3e50;
         }
 
-        .headerActions .button:hover {
-            background-color: #2980b9;
+        .ordersSection h3 {
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            font-size: 1.8rem;
+            color: #34495e;
         }
 
         .ordersTable {
@@ -168,9 +188,24 @@ while ($row = $result->fetch_assoc()) {
         }
 
         .ordersTable tr:nth-child(even) {
-            background-color: #f2f2f2;
+            background-color: #f9f9f9;
         }
 
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .mainContent {
+                margin-left: 0;
+                width: 100%;
+            }
+
+            .totalsSection {
+                flex-direction: column;
+            }
+
+            .totalsSection div {
+                margin-bottom: 10px;
+            }
+        }
         .dark-mode .ordersTable th {
             background-color: #2980b9;
         }
@@ -179,27 +214,12 @@ while ($row = $result->fetch_assoc()) {
             background-color: #34495e;
         }
 
-        @media (max-width: 768px) {
-            .mainContent {
-                margin-left: 0;
-                width: 100%;
-            }
+        .dark-mode .mainHeader h1 {
+            color: white;
+            background-color: transparent; 
         }
-
-        /* Add your CSS styles here */
-        .search-bar {
-            margin-bottom: 20px;
-            text-align: right;
-            float: right;
-            margin-right: 30px; /* Add margin to the right if needed */
-        }
-
-        .search-bar input {
-            padding: 8px 15px;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-            width: 200px;
-            font-size: 1rem;
+        .dark-mode h3 {
+            color: white;
         }
     </style>
 </head>
@@ -223,69 +243,77 @@ while ($row = $result->fetch_assoc()) {
     <!-- Main Content -->
     <div class="mainContent">
         <header class="mainHeader">
-            <h1>Order Reports</h1>
-            <div class="headerActions">
-                <!-- You can add a button here for adding new orders if needed -->
-                <!-- <a href="add-order.php" class="button"><i class="fa fa-plus"></i> Add New Order</a> -->
-            </div>
+            <h1 >Order Reports</h1>
         </header>
 
-        <!-- Search Bar -->
-        <div class="search-bar">
-            <form method="POST" action="">
-                <input type="text" name="searchName" value="<?php echo htmlspecialchars($searchName); ?>" placeholder="Search by Customer Name">
-                <button type="submit" class="button"><i class="fa fa-search"></i> Search</button>
-            </form>
-        </div>
-
         <!-- Totals Section -->
-        <section class="totalsSection mb-6">
-            <h2>Total Orders: <?php echo $totalOrders; ?></h2>
-            <h2>Total Quantity: <?php echo $totalQuantity; ?></h2>
+        <section class="totalsSection">
+            <div>
+                <h2>Total Orders</h2>
+                <span><?php echo $totalOrders; ?></span>
+            </div>
+            <div>
+                <h2>Total Quantity</h2>
+                <span><?php echo $totalQuantity; ?></span>
+            </div>
+            <div>
+                <h2>Total Amount</h2>
+                <span>₱<?php echo number_format($totalAmount, 2); ?></span>
+            </div>
         </section>
 
         <!-- Orders Section -->
         <section class="ordersSection">
-            <?php 
-            // Reset the pointer of the result set to fetch data again for the table
-            $result->data_seek(0);
+            <?php
             $currentCustomer = '';
-            
-            while($row = $result->fetch_assoc()) {
-                // If the customer name has changed, display it above their orders
+            $currentTotal = 0;
+
+            while ($row = $result->fetch_assoc()) {
+                $orderTotal = $row['quantity'] * $row['price'];
+
                 if ($row['customer_name'] !== $currentCustomer) {
-                    // If we already have orders for a previous customer, we can close that section
                     if ($currentCustomer !== '') {
+                        echo "<tfoot><tr><td colspan='4'>Subtotal</td><td>₱" . number_format($currentTotal, 2) . "</td></tr></tfoot>";
                         echo '</tbody></table>';
                     }
-                    
-                    // Update the current customer and display the name with the orders
+
                     $currentCustomer = $row['customer_name'];
-                    $orderDate = date("F j, Y", strtotime($row['order_date'])); // Format the order date
+                    $currentTotal = 0;
+
                     echo "<h3>Customer: " . htmlspecialchars($currentCustomer) . "</h3>";
-                    echo "<p>Order Date: " . $orderDate . "</p>";
+                    echo "<p>Order Date: " . date("F j, Y", strtotime($row['order_date'])) . "</p>";
                     echo "<table class='ordersTable'>
                             <thead>
                                 <tr>
                                     <th>Product Name</th>
+                                    <th>Size</th>
                                     <th>Quantity</th>
+                                    <th>Price</th>
+                                    <th>Total</th>
                                 </tr>
                             </thead>
                             <tbody>";
                 }
-            ?>
+
+                $currentTotal += $orderTotal;
+                ?>
                 <tr>
-                    <td><?php echo isset($row['product_name']) ? htmlspecialchars($row['product_name']) : 'N/A'; ?></td>
-                    <td><?php echo isset($row['quantity']) ? htmlspecialchars($row['quantity']) : 'N/A'; ?></td>
+                    <td><?php echo htmlspecialchars($row['product_name']); ?></td>
+                    <td><?php echo htmlspecialchars($row['size']); ?></td>
+                    <td><?php echo htmlspecialchars($row['quantity']); ?></td>
+                    <td>₱<?php echo number_format($row['price'], 2); ?></td>
+                    <td>₱<?php echo number_format($orderTotal, 2); ?></td>
                 </tr>
-            <?php 
+                <?php
             }
-            // Close the last table after the loop finishes
-            echo '</tbody></table>';
+
+            if ($currentCustomer !== '') {
+                echo "<tfoot><tr><td colspan='4'>Subtotal</td><td>₱" . number_format($currentTotal, 2) . "</td></tr></tfoot>";
+                echo '</tbody></table>';
+            }
             ?>
         </section>
     </div>
-
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             if (localStorage.getItem('darkMode') === 'enabled') {
@@ -300,6 +328,10 @@ while ($row = $result->fetch_assoc()) {
             } else {
                 localStorage.setItem('darkMode', 'disabled');
             }
+        }
+
+        function clearSearch() {
+            window.location.href = 'inventory.php';
         }
     </script>
 </body>
