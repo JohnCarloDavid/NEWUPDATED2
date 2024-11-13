@@ -30,7 +30,7 @@ if ($selected_date && $searchQuery) {
     $sql = "SELECT o.*, i.size, i.price FROM tb_orders o 
             JOIN tb_inventory i ON o.product_name = i.name 
             WHERE o.order_date = ? AND o.customer_name LIKE ? 
-            ORDER BY o.order_id ASC";
+            ORDER BY o.order_id DESC";  // Changed ASC to DESC
     $stmt = $conn->prepare($sql);
     $searchParam = "%" . $searchQuery . "%";
     $stmt->bind_param('ss', $selected_date, $searchParam);
@@ -39,7 +39,7 @@ if ($selected_date && $searchQuery) {
 } elseif ($selected_date) {
     $sql = "SELECT o.*, i.size, i.price FROM tb_orders o 
             JOIN tb_inventory i ON o.product_name = i.name 
-            WHERE o.order_date = ? ORDER BY o.order_id ASC";
+            WHERE o.order_date = ? ORDER BY o.order_id DESC";  // Changed ASC to DESC
     $stmt = $conn->prepare($sql);
     $stmt->bind_param('s', $selected_date);
     $stmt->execute();
@@ -47,7 +47,7 @@ if ($selected_date && $searchQuery) {
 } elseif ($searchQuery) {
     $sql = "SELECT o.*, i.size, i.price FROM tb_orders o 
             JOIN tb_inventory i ON o.product_name = i.name 
-            WHERE o.customer_name LIKE ? ORDER BY o.order_id ASC";
+            WHERE o.customer_name LIKE ? ORDER BY o.order_id DESC";  // Changed ASC to DESC
     $stmt = $conn->prepare($sql);
     $searchParam = "%" . $searchQuery . "%";
     $stmt->bind_param('s', $searchParam);
@@ -57,7 +57,7 @@ if ($selected_date && $searchQuery) {
     // Default query if no filters are applied
     $sql = "SELECT o.*, i.size, i.price FROM tb_orders o 
             JOIN tb_inventory i ON o.product_name = i.name 
-            ORDER BY o.order_id ASC";
+            ORDER BY o.order_id DESC";  // Changed ASC to DESC
     $result = $conn->query($sql);
 }
 
@@ -286,6 +286,25 @@ $total_quantity = 0;
 .search-input:focus {
     border-color: #4CAF50;
 }
+/* Styling for the clear search button */
+.clear-button {
+    background-color: #e74c3c; 
+    color: white; 
+    padding: 8px 15px; 
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    margin-left: 10px;
+    font-size: 14px;
+}
+
+.clear-button:hover {
+    background-color: #c0392b;
+}
+
+.clear-button:focus {
+    outline: none;
+}
 
     </style>
 </head>
@@ -316,13 +335,11 @@ $total_quantity = 0;
                 <form action="orders.php" method="GET" class="search-form">
                     <input type="text" name="search" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="Search by customer name" class="search-input" />
                     <button type="submit" class="search-button"><i class="fa fa-search"></i></button>
+                    <!-- Clear Search Button -->
+                    <button type="button" class="clear-button" onclick="clearSearch()">Clear Search</button>
                 </form>
             </div>
         </header>
-        <!-- Total Orders and Total Quantity -->
-        <section class="orderTotals">
-            <p>Total Orders: <?php echo $total_orders; ?></p>
-        </section>
 
         <!-- Orders Table -->
         <section class="ordersSection">
@@ -363,7 +380,7 @@ $total_quantity = 0;
                         <!-- Customer Name Row -->
                         <tr class="customer-row">
                             <td colspan="6" class="customer-name">
-                                <strong><?php echo htmlspecialchars($row['customer_name']); ?></strong>
+                                <strong>Customer: <?php echo htmlspecialchars($row['customer_name']); ?></strong>
                             </td>
                         </tr>
                         <!-- Order Date Row -->
@@ -395,30 +412,20 @@ $total_quantity = 0;
                         // Display the total amount for the last customer
                         echo '<tr><td colspan="6"><strong>Total Amount: ' . number_format($customerTotalAmount, 2) . '</strong></td></tr>';
                     } else {
-                        echo '<tr><td colspan="7">No orders found.</td></tr>';
+                        echo '<tr><td colspan="6">No orders found.</td></tr>';
                     }
                     ?>
-                    <!-- Order Summary -->
-                    <section class="orderSummary">
-                        <p>Total Quantity: <?php echo $total_quantity; ?></p>
-                        <p>Total Amount: <?php echo number_format($total_amount, 2); ?></p>
-                    </section>
                 </tbody>
             </table>
         </section>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const searchForm = document.querySelector('.search-form');
-            searchForm.addEventListener('submit', function(event) {
-                const searchInput = document.querySelector('.search-input').value;
-                if (!searchInput.trim()) {
-                    event.preventDefault();
-                    alert('Please enter a customer name to search.');
-                }
-            });
-        });
+        // Function to clear search input
+        function clearSearch() {
+            document.querySelector('.search-input').value = '';
+            document.querySelector('.search-form').submit();
+        }
     </script>
 </body>
 </html>
